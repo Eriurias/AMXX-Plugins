@@ -1,0 +1,13 @@
+[en]
+PLAY_INFO = Information about the music:
+PLAY_INFO_NULL = no information.
+
+PLAY_SWITCH_ON = Music in the late rounds enabled successfully!
+PLAY_SWITCH_OFF = Music in the late rounds disabled successfully!
+
+[ru]
+PLAY_INFO = Информация о треке:
+PLAY_INFO_NULL = информация отсутствует.
+
+PLAY_SWITCH_ON = Музыка в конце раунда успешно включена!
+PLAY_SWITCH_OFF = Музыка в конце раунда успешно отключена!

@@ -1,0 +1,9 @@
+[ru]
+
+MINUTES_AND_SECONDS = Смена ника будет возможна через %i минут %i секунд
+SECONDS = Смена ника будет возможна через %i !yсекунд
+
+[en]
+
+MINUTES_AND_SECONDS = Changing nickname will be possible through %i minutes %i seconds
+SECONDS = Changing nickname will be possible through %i seconds
