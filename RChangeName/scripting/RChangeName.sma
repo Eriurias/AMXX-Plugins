@@ -29,7 +29,7 @@ public plugin_init()
     
     iCvarTime = register_cvar("rcn_change_time", "60");
     
-    register_dictionary(szDictionary);
+    register_dictionary_colored(szDictionary);
 }
 
 public plugin_cfg() iCvarTime = get_pcvar_num( iCvarTime );
