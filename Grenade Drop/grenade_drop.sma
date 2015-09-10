@@ -1,18 +1,27 @@
 #include <amxmodx>
 #include <cstrike>
 #include <hamsandwich>
-#include <fakemeta_util>
+#include <fakemeta>
+#include <fun>
  
 #pragma semicolon 1
 
-#define OFFSET_ACTIVE_ITEM 373
-#define OFFSET_LINUX 5
-
 #define PLUGIN "Grenade Drop"
-#define VERSION "1.2"
-#define DATE "20.07.2015"
+#define VERSION "2.5"
+#define DATE "10.09.2015"
 #define URL "http://eriurias.ru"
 #define AUTHOR "Eriurias & PRoSToTeM@"
+
+#define IsValidPrivateDate(%1) (pev_valid(%1) == 2)
+
+const m_pActiveItem = 373;
+const XO_CBASEPLAYER = 5;
+
+const m_pPlayer = 41;
+const XO_CBASEPLAYERWEAPON = 4;
+
+const MsgId_WeapPickup = 92;
+const MsgId_AmmoPickup = 91;
 
 enum
 {
@@ -29,7 +38,8 @@ new const szItemList[][] =
 };
 
 new g_nRestoreFlashbangCount;
-new bool:g_fIsFlashbangActive;
+new bool: g_bIsFlashbangActive;
+new g_fwHookClientCommand;
 
 public plugin_init()
 {
@@ -38,50 +48,57 @@ public plugin_init()
     for (new i; i < sizeof(szItemList); i++)
         RegisterHam(Ham_CS_Item_CanDrop, szItemList[i], "fwHamItemCanDrop_Pre");
     
-    register_clcmd("drop", "ClCmdDrop");
-    register_forward(FM_ClientCommand, "ClientCommand_PostHook", true);
-    
-    register_message(get_user_msgid("WeapPickup"), "msgWeaponPickup");
-    register_message(get_user_msgid("AmmoPickup"), "msgWeaponPickup");
+    register_message(MsgId_WeapPickup, "msgWeaponPickup");
+    register_message(MsgId_AmmoPickup, "msgWeaponPickup");
 }
 
-public fwHamItemCanDrop_Pre(iWeapon)
-{    
+public fwHamItemCanDrop_Pre(nWeapon)
+{
+    if (!IsValidPrivateDate(nWeapon))
+        return HAM_IGNORED;
+    
     SetHamReturnInteger(true);
+    
+    new nClientIndex = get_pdata_cbase(nWeapon, m_pPlayer, XO_CBASEPLAYERWEAPON);
+    
+    g_nRestoreFlashbangCount = cs_get_user_bpammo(nClientIndex, CSW_FLASHBANG);
+    cs_set_user_bpammo(nClientIndex, CSW_FLASHBANG, -g_nRestoreFlashbangCount);
+    
+    new pActiveItem = get_pdata_cbase(nClientIndex, m_pActiveItem, XO_CBASEPLAYER);
+    
+    if (pActiveItem > 0)
+        g_bIsFlashbangActive = cs_get_weapon_id(pActiveItem) == CSW_FLASHBANG;
+    
+    g_fwHookClientCommand = register_forward(FM_ClientCommand, "fwClientCommand_Post", true);
        
     return HAM_SUPERCEDE;
 }
 
-public ClCmdDrop(nClientIndex)
-{    
-    g_nRestoreFlashbangCount = cs_get_user_bpammo(nClientIndex, CSW_FLASHBANG);
-    cs_set_user_bpammo(nClientIndex, CSW_FLASHBANG, -g_nRestoreFlashbangCount);
-    
-    static pActiveItem; pActiveItem = get_pdata_cbase(nClientIndex, OFFSET_ACTIVE_ITEM, OFFSET_LINUX);
-    if (pActiveItem > 0)
-        g_fIsFlashbangActive = cs_get_weapon_id(pActiveItem) == CSW_FLASHBANG;
-}
-
-public ClientCommand_PostHook(nClientIndex)
+public fwClientCommand_Post(nClientIndex)
 {
-    if (g_nRestoreFlashbangCount)
-    {
-        if (cs_get_user_bpammo(nClientIndex, CSW_FLASHBANG) == -1)
-            cs_set_user_bpammo(nClientIndex, CSW_FLASHBANG, 1);
-        else if (cs_get_user_bpammo(nClientIndex, CSW_FLASHBANG) == -2)
-            cs_set_user_bpammo(nClientIndex, CSW_FLASHBANG, 2);
-        else if (g_nRestoreFlashbangCount == 2)
-        {
-            fm_give_item(nClientIndex, szItemList[FLASHBANG]);
-            
-            if (g_fIsFlashbangActive)
-                engclient_cmd(nClientIndex, szItemList[FLASHBANG]);
-        }
-        
-        g_nRestoreFlashbangCount = 0;
-    }
+    unregister_forward(FM_ClientCommand, g_fwHookClientCommand, true);
     
-    g_fIsFlashbangActive = false;
+    static szCommand[5]; read_argv(0, szCommand, charsmax(szCommand));
+    
+    if(equal(szCommand, "drop"))
+    {
+        if (g_nRestoreFlashbangCount)
+        {
+            cs_set_user_bpammo(nClientIndex, CSW_FLASHBANG, abs(cs_get_user_bpammo(nClientIndex, CSW_FLASHBANG)));
+            
+            if (g_nRestoreFlashbangCount >= 2)
+            {
+                give_item(nClientIndex, szItemList[FLASHBANG]);
+                
+                if (g_bIsFlashbangActive)
+                    engclient_cmd(nClientIndex, szItemList[FLASHBANG]);
+            }
+            
+            g_nRestoreFlashbangCount = 0;
+            
+            g_bIsFlashbangActive = false;
+        }
+    }
 }
 
 public msgWeaponPickup(pMsgId, pMsgDest, pMsgReceiver)
