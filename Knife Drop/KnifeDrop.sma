@@ -1,14 +1,17 @@
 #include <amxmodx>
 #include <hamsandwich>
-#include <fakemeta_util>
+#include <fakemeta>
+#include <fun>
 
 #pragma semicolon 1
 
 #define PLUGIN "Knife Drop"
-#define VERSION "1.0"
-#define DATE "28.08.2015"
+#define VERSION "1.5 fix"
+#define DATE "10.09.2015"
 #define URL "http://eriurias.ru"
 #define AUTHOR "Eriurias"
+
+#define IsValidPrivateDate(%1) (pev_valid(%1) == 2)
 
 new const ENTITY_CLASSNAME[] = "weapon_knife";
  
@@ -23,6 +26,9 @@ public plugin_init()
  
 public fwHamItemCanDrop_Pre(pWeapon)
 {
+    if (!IsValidPrivateDate(pWeapon))
+        return HAM_IGNORED;
+    
     SetHamReturnInteger(true);
         
     return HAM_SUPERCEDE;
@@ -30,7 +36,7 @@ public fwHamItemCanDrop_Pre(pWeapon)
 
 public fwHamTouch_Pre(pEntity, nClientIndex)
 {
-    if (pev(pEntity, pev_flags) & FL_ONGROUND)
+    if (pev(pEntity, pev_flags) & FL_ONGROUND && is_user_alive(nClientIndex))
     {
         static szModel[32];
         pev(pEntity, pev_model, szModel, charsmax(szModel));
@@ -45,5 +51,5 @@ public fwHamTouch_Pre(pEntity, nClientIndex)
 public fwHamPlayerSpawn_Post(nClientIndex)
 {
     if (is_user_alive(nClientIndex) && !user_has_weapon(nClientIndex, CSW_KNIFE))
-        fm_give_item(nClientIndex, ENTITY_CLASSNAME);
+        give_item(nClientIndex, ENTITY_CLASSNAME);
 }
