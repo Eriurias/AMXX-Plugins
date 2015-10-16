@@ -33,7 +33,8 @@ enum Cvar_Type
 {
     PLAYBACK_MODE,
     VISIBLE_INFO_NULL,
-    PLAYBACK_CONNECT
+    PLAYBACK_CONNECT,
+    CHANGE_VOLUME
 };
 
 new Array: g_aPlayList, g_nArraySize;
@@ -96,6 +97,7 @@ public plugin_init()
     g_nCvarData[PLAYBACK_MODE] = register_cvar("ers_sound_mode", "0");
     g_nCvarData[VISIBLE_INFO_NULL] = register_cvar("ers_show_info_null", "1");
     g_nCvarData[PLAYBACK_CONNECT] = register_cvar("ers_playback_connect", "1");
+    g_nCvarData[CHANGE_VOLUME] = register_cvar("ers_change_volume", "1");
     
     register_dictionary(NAME_DICTIONARY);
 }
@@ -105,6 +107,7 @@ public plugin_cfg()
     g_nCvarData[PLAYBACK_MODE] = get_pcvar_num(g_nCvarData[PLAYBACK_MODE]);
     g_nCvarData[VISIBLE_INFO_NULL] = get_pcvar_num(g_nCvarData[VISIBLE_INFO_NULL]);
     g_nCvarData[PLAYBACK_CONNECT] = get_pcvar_num(g_nCvarData[PLAYBACK_CONNECT]);
+    g_nCvarData[CHANGE_VOLUME] = get_pcvar_num(g_nCvarData[CHANGE_VOLUME]);
 }
 
 public MusicSwitch(nClientIndex)
@@ -120,9 +123,9 @@ public client_connect(nClientIndex)
         get_track(szSound, _, true);
         
         if (contain(szSound, ".mp3") != -1)
-            client_cmd(nClientIndex, "MP3Volume 1;mp3 play %s", szSound);
+            client_cmd(nClientIndex, "%s mp3 play %s", g_nCvarData[CHANGE_VOLUME] ? "MP3Volume 1;" : "", szSound);
         else if (contain(szSound, ".wav") != -1)
-            client_cmd(nClientIndex, "volume 1;spk %s", szSound);
+            client_cmd(nClientIndex, "%s spk %s", g_nCvarData[CHANGE_VOLUME] ? "volume 1;" : "", szSound);
     }
 }
 
@@ -146,9 +149,9 @@ public fwdEndRound()
             continue;
             
         if (contain(szSound, ".mp3") != -1)
-            client_cmd(nClientIndex, "MP3Volume 1;mp3 play %s", szSound);
+            client_cmd(nClientIndex, "%s mp3 play %s", g_nCvarData[CHANGE_VOLUME] ? "MP3Volume 1;" : "", szSound);
         else if (contain(szSound, ".wav") != -1)
-            client_cmd(nClientIndex, "volume 1;spk %s", szSound);
+            client_cmd(nClientIndex, "%s spk %s", g_nCvarData[CHANGE_VOLUME] ? "volume 1;" : "", szSound);
         
         if (szDescription[0] != '\0')
             client_print_color(nClientIndex, print_team_default, "%s %L \1%s", NAME_PREFIX, nClientIndex, "PLAY_INFO", szDescription);
