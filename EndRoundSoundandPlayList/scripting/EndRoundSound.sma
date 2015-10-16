@@ -8,8 +8,8 @@
 #pragma ctrlchar '\'
 
 #define PLUGIN "End Round Sound and PlayList"
-#define VERSION "1.0"
-#define DATE "06.07.2015"
+#define VERSION "2.1"
+#define DATE "16.10.2015"
 #define URL "http://eriurias.ru"
 #define AUTHOR "Eriurias"
 
@@ -25,25 +25,33 @@
 
 enum Type
 {
-    NEW_SOUND = 0,
+    NEW_SOUND,
     OLD_SOUND
 };
 
-new Array: tPlayList, g_nCvarType, g_nCvarShowNull, iArraySize;
-new bool:gPlayerValue[MAX_PLAYERS + 1] = {true, ...};
+enum Cvar_Type
+{
+    PLAYBACK_MODE,
+    VISIBLE_INFO_NULL,
+    PLAYBACK_CONNECT
+};
+
+new Array: g_aPlayList, g_nArraySize;
+new bool: g_bPlayerPlayback[MAX_PLAYERS + 1] = {true, ...};
+new g_nCvarData[Cvar_Type];
 
 public plugin_precache()
 {
-    tPlayList = ArrayCreate(MAX_ARRAYSIZE);
+    g_aPlayList = ArrayCreate(MAX_ARRAYSIZE);
     
-    new szCfgDir[MAX_STRSIZE], iFile;
+    new szCfgDir[MAX_STRSIZE], nFile;
     get_configsdir(szCfgDir, charsmax(szCfgDir));
     
     formatex(szCfgDir, charsmax(szCfgDir), "%s/%s", szCfgDir, NAME_PLAYLIST);
     
-    iFile = fopen(szCfgDir, "rt");
+    nFile = fopen(szCfgDir, "rt");
     
-    if (!iFile)
+    if (!nFile)
     {
         log_to_error("File (%s) not exists! Plugin stopped!", NAME_PLAYLIST);
         pause("d");
@@ -51,9 +59,9 @@ public plugin_precache()
     
     new szBuffer[MAX_ARRAYSIZE], szSound[MAX_STRSIZE];
     
-    while (!feof(iFile))
+    while (!feof(nFile))
     {
-        fgets(iFile, szBuffer, charsmax(szBuffer));
+        fgets(nFile, szBuffer, charsmax(szBuffer));
         
         trim(szBuffer);
         
@@ -67,10 +75,10 @@ public plugin_precache()
         else if (contain(szSound, ".wav") != -1)
             precache_sound(szSound);
         
-        ArrayPushString(tPlayList, szBuffer);
+        ArrayPushString(g_aPlayList, szBuffer);
     }
     
-    if ((iArraySize = ArrayCharsmax(tPlayList)) == -1)
+    if ((g_nArraySize = ArrayCharsmax(g_aPlayList)) == -1)
     {
         log_to_error("An empty playlist. Plugin stopped!");
         pause("d");
@@ -85,91 +93,109 @@ public plugin_init()
     
     register_clcmd("say /music", "MusicSwitch");
     
-    g_nCvarType = register_cvar("ers_sound_mode", "0");
-    g_nCvarShowNull = register_cvar("ers_show_info_null", "1");
+    g_nCvarData[PLAYBACK_MODE] = register_cvar("ers_sound_mode", "0");
+    g_nCvarData[VISIBLE_INFO_NULL] = register_cvar("ers_show_info_null", "1");
+    g_nCvarData[PLAYBACK_CONNECT] = register_cvar("ers_playback_connect", "1");
     
     register_dictionary(NAME_DICTIONARY);
 }
 
 public plugin_cfg()
 {
-    g_nCvarType = get_pcvar_num(g_nCvarType);
-    g_nCvarShowNull = get_pcvar_num(g_nCvarShowNull);
+    g_nCvarData[PLAYBACK_MODE] = get_pcvar_num(g_nCvarData[PLAYBACK_MODE]);
+    g_nCvarData[VISIBLE_INFO_NULL] = get_pcvar_num(g_nCvarData[VISIBLE_INFO_NULL]);
+    g_nCvarData[PLAYBACK_CONNECT] = get_pcvar_num(g_nCvarData[PLAYBACK_CONNECT]);
 }
 
-public MusicSwitch(Player)
-    gPlayerValue[Player] = !gPlayerValue[Player],
-    client_print_color(Player, print_team_default, "%s %L", NAME_PREFIX, Player, gPlayerValue[Player] ? "PLAY_SWITCH_ON" : "PLAY_SWITCH_OFF");
+public MusicSwitch(nClientIndex)
+    g_bPlayerPlayback[nClientIndex] = !g_bPlayerPlayback[nClientIndex],
+    client_print_color(nClientIndex, print_team_default, "%s %L", NAME_PREFIX, nClientIndex, g_bPlayerPlayback[nClientIndex] ? "PLAY_SWITCH_ON" : "PLAY_SWITCH_OFF");
+
+public client_connect(nClientIndex)
+{
+    if (g_nCvarData[PLAYBACK_CONNECT])
+    {
+        static szSound[MAX_STRSIZE];
+        
+        get_track(szSound, _, true);
+        
+        if (contain(szSound, ".mp3") != -1)
+            client_cmd(nClientIndex, "MP3Volume 1;mp3 play %s", szSound);
+        else if (contain(szSound, ".wav") != -1)
+            client_cmd(nClientIndex, "volume 1;spk %s", szSound);
+    }
+}
 
 public fwdEndRound()
 {
-    static szBuffer[MAX_ARRAYSIZE], szSound[MAX_STRSIZE], szDescription[MAX_STRSIZE], 
-    iRandomSound[Type], gPlayers[MAX_PLAYERS], iNum, i, Player;
+    static szSound[MAX_STRSIZE], szDescription[MAX_STRSIZE], 
+    gPlayers[MAX_PLAYERS], iNum, i, nClientIndex;
     
     get_players(gPlayers, iNum, "ch");
 
     if (!iNum)
         return;
 
-    if (g_nCvarType)
+    get_track(szSound, szDescription);
+        
+    for (i = 0; i < iNum; i++)
     {
-        while (iRandomSound[NEW_SOUND] == iRandomSound[OLD_SOUND])
-            iRandomSound[NEW_SOUND] = random(iArraySize);
-
-        iRandomSound[OLD_SOUND] = iRandomSound[NEW_SOUND];
-        
-        ArrayGetString(tPlayList, iRandomSound[NEW_SOUND], szBuffer, charsmax(szBuffer));
-        parse(szBuffer, szSound, charsmax(szSound), szDescription, charsmax(szDescription));
-        
-        for (i = 0; i < iNum; i++)
-        {
-            Player = gPlayers[i];
+        nClientIndex = gPlayers[i];
             
-            if (!gPlayerValue[Player]) continue;
+        if (!g_bPlayerPlayback[nClientIndex])
+            continue;
             
-            if (contain(szSound, ".mp3") != -1)
-                client_cmd(Player, "MP3Volume 5;mp3 play %s", szSound);
-            else if (contain(szSound, ".wav") != -1)
-                client_cmd(Player, "volume 5;spk %s", szSound);
+        if (contain(szSound, ".mp3") != -1)
+            client_cmd(nClientIndex, "MP3Volume 1;mp3 play %s", szSound);
+        else if (contain(szSound, ".wav") != -1)
+            client_cmd(nClientIndex, "volume 1;spk %s", szSound);
         
-            if (szDescription[0] != '\0')
-                client_print_color(Player, print_team_default, "%s %L \1%s", NAME_PREFIX, Player, "PLAY_INFO", szDescription);
-            else if ((szDescription[0] == '\0') && g_nCvarShowNull)                
-                client_print_color(Player, print_team_default, "%s %L \1%L", NAME_PREFIX, Player, "PLAY_INFO", LANG_PLAYER, "PLAY_INFO_NULL");
-        }
-    }
-    else
-    {
-        static iSound;
-        
-        ArrayGetString(tPlayList, iSound, szBuffer, charsmax(szBuffer));
-        parse(szBuffer, szSound, charsmax(szSound), szDescription, charsmax(szDescription));
-        
-        for (i = 0; i < iNum; i++)
-        {
-            Player = gPlayers[i];
-            
-            if (!gPlayerValue[Player]) continue;
-            
-            if (contain(szSound, ".mp3") != -1)
-                client_cmd(Player, "MP3Volume 5;mp3 play %s", szSound);
-            else if (contain(szSound, ".wav") != -1)
-                client_cmd(Player, "volume 5;spk %s", szSound);
-        
-            if (szDescription[0] != '\0')
-                client_print_color(Player, print_team_default, "%s %L \1%s", NAME_PREFIX, Player, "PLAY_INFO", szDescription);
-            else if ((szDescription[0] == '\0') && g_nCvarShowNull)
-                client_print_color(Player, print_team_default, "%s %L \1%L", NAME_PREFIX, Player, "PLAY_INFO", Player, "PLAY_INFO_NULL");
-        }
-        
-        if (iSound == iArraySize)
-            iSound = 0;
-        else
-            iSound++;
+        if (szDescription[0] != '\0')
+            client_print_color(nClientIndex, print_team_default, "%s %L \1%s", NAME_PREFIX, nClientIndex, "PLAY_INFO", szDescription);
+        else if (szDescription[0] == '\0' && g_nCvarData[VISIBLE_INFO_NULL])                
+            client_print_color(nClientIndex, print_team_default, "%s %L \1%L", NAME_PREFIX, nClientIndex, "PLAY_INFO", LANG_PLAYER, "PLAY_INFO_NULL");
     }
     
     if (szDescription[0] != '\0')
         szDescription[0] = '\0';
+}
+
+stock get_track(szSound[MAX_STRSIZE], szDescription[MAX_STRSIZE] = "", bool: bConnect = false)
+{
+    static szBuffer[MAX_ARRAYSIZE], nRandomSound[Type];
+    
+    if (g_nCvarData[PLAYBACK_MODE])
+    {
+        while (nRandomSound[NEW_SOUND] == nRandomSound[OLD_SOUND])
+            nRandomSound[NEW_SOUND] = random(g_nArraySize);
+
+        nRandomSound[OLD_SOUND] = nRandomSound[NEW_SOUND];
+        
+        ArrayGetString(g_aPlayList, nRandomSound[NEW_SOUND], szBuffer, charsmax(szBuffer));
+        parse(szBuffer, szSound, charsmax(szSound), szDescription, charsmax(szDescription));
+    }
+    else
+    {
+        static nSoundRound, nSoundConnect;
+        
+        ArrayGetString(g_aPlayList, bConnect ? nSoundConnect : nSoundRound, szBuffer, charsmax(szBuffer));
+        parse(szBuffer, szSound, charsmax(szSound), szDescription, charsmax(szDescription));
+        
+        if (bConnect)
+        {
+            if (nSoundConnect == g_nArraySize)
+                nSoundConnect = 0;
+            else
+                nSoundConnect++;
+        }
+        else
+        {
+            if (nSoundRound == g_nArraySize)
+                nSoundRound = 0;
+            else
+                nSoundRound++;
+        }
+    }
 }
 
 stock log_to_error(const szMessage[], ...)
