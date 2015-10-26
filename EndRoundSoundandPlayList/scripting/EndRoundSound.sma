@@ -40,6 +40,7 @@ enum Cvar_Type
 new Array: g_aPlayList, g_nArraySize;
 new bool: g_bPlayerPlayback[MAX_PLAYERS + 1] = {true, ...};
 new g_nCvarData[Cvar_Type];
+new bool: g_bRoundEnded;
 
 public plugin_precache()
 {
@@ -91,6 +92,7 @@ public plugin_init()
     register_plugin(PLUGIN, VERSION, AUTHOR/*, DATE, URL*/);
     
     register_logevent("fwdEndRound", 2, "1=Round_End");
+    register_event("HLTV", "fwdNewRound", "a", "1=0", "2=0");
     
     register_clcmd("say /music", "MusicSwitch");
     
@@ -131,37 +133,44 @@ public client_connect(nClientIndex)
 
 public fwdEndRound()
 {
-    static szSound[MAX_STRSIZE], szDescription[MAX_STRSIZE], 
-    gPlayers[MAX_PLAYERS], iNum, i, nClientIndex;
-    
-    get_players(gPlayers, iNum, "ch");
-
-    if (!iNum)
-        return;
-
-    get_track(szSound, szDescription);
-        
-    for (i = 0; i < iNum; i++)
+    if (!g_bRoundEnded)
     {
-        nClientIndex = gPlayers[i];
+        g_bRoundEnded = true;//round repeat ended fix
+        
+        static szSound[MAX_STRSIZE], szDescription[MAX_STRSIZE], 
+        gPlayers[MAX_PLAYERS], iNum, i, nClientIndex;
+        
+        get_players(gPlayers, iNum, "ch");
+
+        if (!iNum)
+            return;
+
+        get_track(szSound, szDescription);
             
-        if (!g_bPlayerPlayback[nClientIndex])
-            continue;
+        for (i = 0; i < iNum; i++)
+        {
+            nClientIndex = gPlayers[i];
+                
+            if (!g_bPlayerPlayback[nClientIndex])
+                continue;
+                
+            if (contain(szSound, ".mp3") != -1)
+                client_cmd(nClientIndex, "%s mp3 play %s", g_nCvarData[CHANGE_VOLUME] ? "MP3Volume 1;" : "", szSound);
+            else if (contain(szSound, ".wav") != -1)
+                client_cmd(nClientIndex, "%s spk %s", g_nCvarData[CHANGE_VOLUME] ? "volume 1;" : "", szSound);
             
-        if (contain(szSound, ".mp3") != -1)
-            client_cmd(nClientIndex, "%s mp3 play %s", g_nCvarData[CHANGE_VOLUME] ? "MP3Volume 1;" : "", szSound);
-        else if (contain(szSound, ".wav") != -1)
-            client_cmd(nClientIndex, "%s spk %s", g_nCvarData[CHANGE_VOLUME] ? "volume 1;" : "", szSound);
+            if (szDescription[0] != '\0')
+                client_print_color(nClientIndex, print_team_default, "%s %L \1%s", NAME_PREFIX, nClientIndex, "PLAY_INFO", szDescription);
+            else if (szDescription[0] == '\0' && g_nCvarData[VISIBLE_INFO_NULL])                
+                client_print_color(nClientIndex, print_team_default, "%s %L \1%L", NAME_PREFIX, nClientIndex, "PLAY_INFO", LANG_PLAYER, "PLAY_INFO_NULL");
+        }
         
         if (szDescription[0] != '\0')
-            client_print_color(nClientIndex, print_team_default, "%s %L \1%s", NAME_PREFIX, nClientIndex, "PLAY_INFO", szDescription);
-        else if (szDescription[0] == '\0' && g_nCvarData[VISIBLE_INFO_NULL])                
-            client_print_color(nClientIndex, print_team_default, "%s %L \1%L", NAME_PREFIX, nClientIndex, "PLAY_INFO", LANG_PLAYER, "PLAY_INFO_NULL");
+            szDescription[0] = '\0';
     }
-    
-    if (szDescription[0] != '\0')
-        szDescription[0] = '\0';
 }
+
+public fwdNewRound() g_bRoundEnded = false;
 
 stock get_track(szSound[MAX_STRSIZE], szDescription[MAX_STRSIZE] = "", bool: bConnect = false)
 {
